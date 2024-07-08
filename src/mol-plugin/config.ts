@@ -67,7 +67,7 @@ export const PluginConfig = {
         DefaultRepresentationPreset: item<string>('structure.default-representation-preset', 'auto'),
         DefaultRepresentationPresetParams: item<StructureRepresentationPresetProvider.CommonParams>('structure.default-representation-preset-params', { }),
         SaccharideCompIdMapType: item<SaccharideCompIdMapType>('structure.saccharide-comp-id-map-type', 'default'),
-        ShowMeasurementGroup: item('show-measurement-group', true),
+        ShowMeasurementGroup: item('structure.show-measurement-group', true),
     },
     Background: {
         Styles: item<[BackgroundProps, string][]>('background.styles', []),
