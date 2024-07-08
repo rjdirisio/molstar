@@ -19,6 +19,7 @@ import { MeasurementRepresentationCommonTextParams, LociLabelTextParams } from '
 import { LineParams } from '../../../mol-repr/structure/representation/line';
 import { Expression } from '../../../mol-script/language/expression';
 import { Color } from '../../../mol-util/color';
+import { PluginConfig } from '../../../mol-plugin/config';
 
 export { StructureMeasurementManager };
 
@@ -67,7 +68,7 @@ class StructureMeasurementManager extends StatefulPluginComponent<StructureMeasu
         const builder = this.plugin.state.data.build();
 
         if (groupRef) return builder.to(groupRef);
-        return builder.toRoot().group(StateTransforms.Misc.CreateGroup, { label: `Measurements` }, { tags: MeasurementGroupTag });
+        return builder.toRoot().group(StateTransforms.Misc.CreateGroup, { label: `Measurements` }, { tags: MeasurementGroupTag, state: {isGhost: !this.plugin.config.get(PluginConfig.Structure.ShowMeasurementGroup)} });
     }
 
     async setOptions(options: StructureMeasurementOptions) {
