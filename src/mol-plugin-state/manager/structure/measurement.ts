@@ -68,7 +68,7 @@ class StructureMeasurementManager extends StatefulPluginComponent<StructureMeasu
         const builder = this.plugin.state.data.build();
 
         if (groupRef) return builder.to(groupRef);
-        return builder.toRoot().group(StateTransforms.Misc.CreateGroup, { label: `Measurements` }, { tags: MeasurementGroupTag, state: {isGhost: !this.plugin.config.get(PluginConfig.Structure.ShowMeasurementGroup)} });
+        return builder.toRoot().group(StateTransforms.Misc.CreateGroup, { label: `Measurements` }, { tags: MeasurementGroupTag, state: {isGhost: !this.plugin.config.get(PluginConfig.Structure.ShowMeasurementGroupNode)} });
     }
 
     async setOptions(options: StructureMeasurementOptions) {
