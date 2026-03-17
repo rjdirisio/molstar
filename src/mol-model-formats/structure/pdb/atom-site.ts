@@ -134,6 +134,52 @@ function alignCompIdsToSeqres(seqres: string[], observed: string[]): number[] {
     return result;
 }
 
+/**
+ * Pre-compute SEQRES alignment using Needleman-Wunsch for each chain.
+ * Returns a map from chain id to an array of 1-based SEQRES positions.
+ */
+function computeSeqresAlignments(
+    seqresMap: Map<string, string[]> | undefined,
+    id: CifField,
+    pdbx_PDB_model_num: CifField,
+    auth_asym_id: CifField,
+    auth_seq_id: CifField,
+    pdbx_PDB_ins_code: CifField,
+    auth_comp_id: CifField,
+): Map<string, number[]> {
+    const seqresAlignments = new Map<string, number[]>();
+    if (!seqresMap) return seqresAlignments;
+
+    // Collect unique observed residues per chain (first model only)
+    const chainObserved = new Map<string, string[]>();
+    let prevChain = '', prevSeqId = -99999, prevInsCode = '___';
+    const firstModel = pdbx_PDB_model_num.str(0);
+
+    for (let i = 0, il = id.rowCount; i < il; ++i) {
+        if (pdbx_PDB_model_num.str(i) !== firstModel) break;
+        const chain = auth_asym_id.str(i);
+        const seqId = auth_seq_id.int(i);
+        const insCode = pdbx_PDB_ins_code.str(i);
+
+        if (chain !== prevChain || seqId !== prevSeqId || insCode !== prevInsCode) {
+            if (!chainObserved.has(chain)) chainObserved.set(chain, []);
+            chainObserved.get(chain)!.push(auth_comp_id.str(i));
+            prevChain = chain;
+            prevSeqId = seqId;
+            prevInsCode = insCode;
+        }
+    }
+
+    for (const [chainId, observed] of chainObserved) {
+        const seqres = seqresMap.get(chainId);
+        if (seqres && seqres.length > 0) {
+            seqresAlignments.set(chainId, alignCompIdsToSeqres(seqres, observed));
+        }
+    }
+
+    return seqresAlignments;
+}
+
 export function getAtomSite(sites: AtomSiteTemplate, labelAsymIdHelper: LabelAsymIdHelper, options: { hasAssemblies: boolean, seqresMap?: Map<string, string[]> }): { [K in keyof mmCIF_Schema['atom_site'] | 'partial_charge']?: CifField } {
     labelAsymIdHelper.clear();
 
@@ -158,37 +204,9 @@ export function getAtomSite(sites: AtomSiteTemplate, labelAsymIdHelper: LabelAsy
 
     //
 
-    // Pre-compute SEQRES alignment using Needleman-Wunsch
-    const seqresMap = options.seqresMap;
-    const seqresAlignments = new Map<string, number[]>();
-    if (seqresMap) {
-        // Collect unique observed residues per chain (first model only)
-        const chainObserved = new Map<string, string[]>();
-        let prevChain = '', prevSeqId = -99999, prevInsCode = '___';
-        const firstModel = pdbx_PDB_model_num.str(0);
-
-        for (let i = 0, il = id.rowCount; i < il; ++i) {
-            if (pdbx_PDB_model_num.str(i) !== firstModel) break;
-            const chain = auth_asym_id.str(i);
-            const seqId = auth_seq_id.int(i);
-            const insCode = pdbx_PDB_ins_code.str(i);
-
-            if (chain !== prevChain || seqId !== prevSeqId || insCode !== prevInsCode) {
-                if (!chainObserved.has(chain)) chainObserved.set(chain, []);
-                chainObserved.get(chain)!.push(auth_comp_id.str(i));
-                prevChain = chain;
-                prevSeqId = seqId;
-                prevInsCode = insCode;
-            }
-        }
-
-        for (const [chainId, observed] of chainObserved) {
-            const seqres = seqresMap.get(chainId);
-            if (seqres && seqres.length > 0) {
-                seqresAlignments.set(chainId, alignCompIdsToSeqres(seqres, observed));
-            }
-        }
-    }
+    const seqresAlignments = computeSeqresAlignments(
+        options.seqresMap, id, pdbx_PDB_model_num, auth_asym_id, auth_seq_id, pdbx_PDB_ins_code, auth_comp_id
+    );
 
     let currModelNum = pdbx_PDB_model_num.str(0);
     let currAsymId = auth_asym_id.str(0);
