@@ -180,21 +180,13 @@ describe('PDB SEQRES-to-label_seq_id alignment', () => {
         // residue ordering. The fix ensures label_seq_id is strictly sequential when
         // insertion codes are present, even without SEQRES.
         const pdb = makePdb([
-            //        residue 7A (ins code A) — first segment
             'ATOM      1  CA  HIS A   7A      1.000   2.000   3.000  1.00  0.00           C  ',
-            //        residue 8A (ins code A)
             'ATOM      2  CA  PHE A   8A      4.000   5.000   6.000  1.00  0.00           C  ',
-            //        residue 9A (ins code A)
             'ATOM      3  CA  GLY A   9A      7.000   8.000   9.000  1.00  0.00           C  ',
-            //        residue 4 (no ins code) — second segment, overlaps auth_seq_id range
             'ATOM      4  CA  ALA A   4      10.000  11.000  12.000  1.00  0.00           C  ',
-            //        residue 5 (no ins code)
             'ATOM      5  CA  VAL A   5      13.000  14.000  15.000  1.00  0.00           C  ',
-            //        residue 6 (no ins code)
             'ATOM      6  CA  LEU A   6      16.000  17.000  18.000  1.00  0.00           C  ',
-            //        residue 7 (no ins code) — same auth_seq_id as 7A above
             'ATOM      7  CA  ILE A   7      19.000  20.000  21.000  1.00  0.00           C  ',
-            //        residue 8 (no ins code) — same auth_seq_id as 8A above
             'ATOM      8  CA  PRO A   8      22.000  23.000  24.000  1.00  0.00           C  ',
             'END                                                                             ',
         ].join('\n'));
