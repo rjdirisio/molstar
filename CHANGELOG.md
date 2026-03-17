@@ -6,6 +6,7 @@ Note that since we don't clearly distinguish between a public and private interf
 ## [Unreleased]
 - Add `putty` as a mol-view-spec representation.
 - Fix detecting sidechain-only structures as coarse-grained (#1420)
+- Use PDB SEQRES block to show unresolved residues in Sequence toolbar
 
 ## [v5.7.0] - 2026-02-28
 - Text label improvements
