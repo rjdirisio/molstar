@@ -2,6 +2,7 @@
  * Copyright (c) 2019-2026 mol* contributors, licensed under MIT, See LICENSE file for more info.
  *
  * @author Alexander Rose <alexander.rose@weirdbyte.de>
+ * @author Ryan DiRisio <rjdiris@gmail.com>
  */
 
 import { MoleculeType, isPolymer } from '../../../mol-model/structure/model/types';
@@ -115,7 +116,7 @@ export class EntityBuilder {
         }
     }
 
-    /** Get entity_id for a chain based on SEQRES/COMPND data. Only valid after all atoms have been processed via getEntityId. */
+    /** Get entity_id for a chain based on SEQRES data. Only valid after all atoms have been processed via getEntityId. */
     getEntityIdForChain(chainId: string): string | undefined {
         if (this.compoundsMap.has(chainId)) {
             return this.compoundsMap.get(chainId)!;

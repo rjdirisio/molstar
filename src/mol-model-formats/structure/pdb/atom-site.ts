@@ -4,6 +4,7 @@
  * @author David Sehnal <david.sehnal@gmail.com>
  * @author Alexander Rose <alexander.rose@weirdbyte.de>
  * @author Kim Juho <juho_kim@outlook.com>
+ * @author Ryan DiRisio <rjdiris@gmail.com>
  */
 
 import { CifField } from '../../../mol-io/reader/cif';
