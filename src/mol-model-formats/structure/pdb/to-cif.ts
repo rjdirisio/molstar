@@ -11,7 +11,7 @@ import { Tokenizer } from '../../../mol-io/reader/common/text/tokenizer';
 import { PdbFile } from '../../../mol-io/reader/pdb/schema';
 import { parseCryst1, parseRemark350, parseMtrix } from './assembly';
 import { parseHelix, parseSheet } from './secondary-structure';
-import { parseCmpnd, parseHetnam, parseSeqres } from './entity';
+import { parseCmpnd, parseHetnam, parseSeqres, getEntityPolySeq } from './entity';
 import { ComponentBuilder } from '../common/component';
 import { EntityBuilder } from '../common/entity';
 import { Column } from '../../../mol-data/db';
@@ -252,34 +252,8 @@ export async function pdbToMmCif(pdb: PdbFile): Promise<CifFrame> {
 
     // Build entity_poly_seq from SEQRES
     if (seqresMap) {
-        const epsEntityIds: string[] = [];
-        const epsNums: number[] = [];
-        const epsMonIds: string[] = [];
-        const epsHeteros: string[] = [];
-        const processedEntities = new Set<string>();
-
-        for (const [chainId, residues] of seqresMap) {
-            const entityId = entityBuilder.getEntityIdForChain(chainId);
-            if (!entityId || processedEntities.has(entityId)) continue;
-            processedEntities.add(entityId);
-
-            for (let j = 0; j < residues.length; j++) {
-                epsEntityIds.push(entityId);
-                epsNums.push(j + 1);
-                epsMonIds.push(residues[j]);
-                epsHeteros.push('no');
-            }
-        }
-
-        if (epsEntityIds.length > 0) {
-            const entity_poly_seq: CifCategory.SomeFields<mmCIF_Schema['entity_poly_seq']> = {
-                entity_id: CifField.ofStrings(epsEntityIds),
-                num: CifField.ofNumbers(epsNums),
-                mon_id: CifField.ofStrings(epsMonIds),
-                hetero: CifField.ofStrings(epsHeteros),
-            };
-            categories.entity_poly_seq = CifCategory.ofFields('entity_poly_seq', entity_poly_seq);
-        }
+        const entityPolySeq = getEntityPolySeq(seqresMap, chainId => entityBuilder.getEntityIdForChain(chainId));
+        if (entityPolySeq) helperCategories.push(entityPolySeq);
 
         // Build pdbx_unobs_or_zero_occ_residues by comparing SEQRES with observed ATOM records
         // Collect observed (label_asym_id, label_seq_id) pairs per model, and auth_asym_id -> label_asym_id mapping.

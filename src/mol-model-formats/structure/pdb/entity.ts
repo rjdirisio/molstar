@@ -4,8 +4,10 @@
  * @author Alexander Rose <alexander.rose@weirdbyte.de>
  */
 
+import { CifCategory, CifField } from '../../../mol-io/reader/cif';
 import { Tokens } from '../../../mol-io/reader/common/text/tokenizer';
 import { EntityCompound } from '../common/entity';
+import { mmCIF_Schema } from '../../../mol-io/reader/cif/schema/mmcif';
 
 const Spec = {
     'MOL_ID': '',
@@ -116,6 +118,42 @@ export function parseHetnam(lines: Tokens, lineStart: number, lineEnd: number) {
     }
 
     return hetnams;
+}
+
+export function getEntityPolySeq(
+    seqresMap: Map<string, string[]>,
+    getEntityIdForChain: (chainId: string) => string | undefined
+): CifCategory | undefined {
+    const epsEntityIds: string[] = [];
+    const epsNums: number[] = [];
+    const epsMonIds: string[] = [];
+    const epsHeteros: string[] = [];
+    const processedEntities = new Set<string>();
+
+    for (const [chainId, residues] of seqresMap) {
+        const entityId = getEntityIdForChain(chainId);
+        if (!entityId || processedEntities.has(entityId)) continue;
+        processedEntities.add(entityId);
+
+        for (let j = 0; j < residues.length; j++) {
+            epsEntityIds.push(entityId);
+            epsNums.push(j + 1);
+            epsMonIds.push(residues[j]);
+            epsHeteros.push('no');
+        }
+    }
+
+    if (epsEntityIds.length > 0) {
+        const entity_poly_seq: CifCategory.SomeFields<mmCIF_Schema['entity_poly_seq']> = {
+            entity_id: CifField.ofStrings(epsEntityIds),
+            num: CifField.ofNumbers(epsNums),
+            mon_id: CifField.ofStrings(epsMonIds),
+            hetero: CifField.ofStrings(epsHeteros),
+        };
+        return CifCategory.ofFields('entity_poly_seq', entity_poly_seq);
+    }
+
+    return undefined;
 }
 
 export function parseSeqres(lines: Tokens, lineStart: number, lineEnd: number) {
