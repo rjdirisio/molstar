@@ -63,7 +63,6 @@ export async function pdbToMmCif(pdb: PdbFile): Promise<CifFrame> {
     let modelNum = 0, modelStr = '';
     let conectRange: [number, number] | undefined = undefined;
     let hasAssemblies = false;
-    let hasSeqRes = false;
     let seqresMap: Map<string, string[]> | undefined = undefined;
     const terIndices = new Set<number>();
 
@@ -183,10 +182,15 @@ export async function pdbToMmCif(pdb: PdbFile): Promise<CifFrame> {
                         if (!substringStartsWith(data, s, e, 'SEQRES')) break;
                         j++;
                     }
-                    seqresMap = parseSeqres(lines, i, j);
-                    entityBuilder.setSeqres(seqresMap);
+                    if (seqresMap) {
+                        if (isDebugMode) {
+                            console.log('only single SEQRES block allowed, ignoring others');
+                        }
+                    } else {
+                        seqresMap = parseSeqres(lines, i, j);
+                        entityBuilder.setSeqres(seqresMap);
+                    }
                     i = j - 1;
-                    hasSeqRes = true;
                 }
                 // TODO: SCALE record => cif.atom_sites.fract_transf_matrix, cif.atom_sites.fract_transf_vector
                 break;
@@ -232,7 +236,7 @@ export async function pdbToMmCif(pdb: PdbFile): Promise<CifFrame> {
         const asymId = labelAsymIdHelper.get(i);
         atomSite.label_entity_id[i] = entityBuilder.getEntityId(compId, moleculeType, asymId);
     }
-    const atom_site = getAtomSite(atomSite, labelAsymIdHelper, { hasAssemblies, hasSeqRes, seqresMap });
+    const atom_site = getAtomSite(atomSite, labelAsymIdHelper, { hasAssemblies, seqresMap });
     if (variant === 'pdb') delete atom_site.partial_charge;
 
     if (conectRange) {

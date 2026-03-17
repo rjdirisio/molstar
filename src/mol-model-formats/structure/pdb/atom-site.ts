@@ -134,7 +134,7 @@ function alignCompIdsToSeqres(seqres: string[], observed: string[]): number[] {
     return result;
 }
 
-export function getAtomSite(sites: AtomSiteTemplate, labelAsymIdHelper: LabelAsymIdHelper, options: { hasAssemblies: boolean, hasSeqRes: boolean, seqresMap?: Map<string, string[]> }): { [K in keyof mmCIF_Schema['atom_site'] | 'partial_charge']?: CifField } {
+export function getAtomSite(sites: AtomSiteTemplate, labelAsymIdHelper: LabelAsymIdHelper, options: { hasAssemblies: boolean, seqresMap?: Map<string, string[]> }): { [K in keyof mmCIF_Schema['atom_site'] | 'partial_charge']?: CifField } {
     labelAsymIdHelper.clear();
 
     const pdbx_PDB_model_num = CifField.ofStrings(sites.pdbx_PDB_model_num);
@@ -146,7 +146,7 @@ export function getAtomSite(sites: AtomSiteTemplate, labelAsymIdHelper: LabelAsy
     const id = CifField.ofStrings(sites.id);
 
     // serial label_seq_id if there are ins codes
-    let useLinearLabelSeqId = options.hasSeqRes;
+    let useLinearLabelSeqId = !!options.seqresMap;
     if (!useLinearLabelSeqId) {
         for (let i = 0, il = id.rowCount; i < il; ++i) {
             if (pdbx_PDB_ins_code.str(i) !== '') {
