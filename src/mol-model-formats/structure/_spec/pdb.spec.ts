@@ -171,4 +171,67 @@ describe('PDB SEQRES-to-label_seq_id alignment', () => {
         expect(labelSeqId.int(1)).toBe(2);
         expect(labelSeqId.int(2)).toBe(2);
     });
+
+    it('produces linear label_seq_id with overlapping auth_seq_id and insertion codes (1NSA-like, regression #1730)', async () => {
+        // Regression test for https://github.com/molstar/molstar/issues/1730
+        // 1NSA has residues numbered 7A, 8A, ... (with insertion code) followed by
+        // 4, 5, 6, 7, 8, ... (without insertion code). The overlapping auth_seq_id
+        // values (e.g. 7A vs 7) previously caused interleaved label_seq_id, breaking
+        // residue ordering. The fix ensures label_seq_id is strictly sequential when
+        // insertion codes are present, even without SEQRES.
+        const pdb = makePdb([
+            //        residue 7A (ins code A) — first segment
+            'ATOM      1  CA  HIS A   7A      1.000   2.000   3.000  1.00  0.00           C  ',
+            //        residue 8A (ins code A)
+            'ATOM      2  CA  PHE A   8A      4.000   5.000   6.000  1.00  0.00           C  ',
+            //        residue 9A (ins code A)
+            'ATOM      3  CA  GLY A   9A      7.000   8.000   9.000  1.00  0.00           C  ',
+            //        residue 4 (no ins code) — second segment, overlaps auth_seq_id range
+            'ATOM      4  CA  ALA A   4      10.000  11.000  12.000  1.00  0.00           C  ',
+            //        residue 5 (no ins code)
+            'ATOM      5  CA  VAL A   5      13.000  14.000  15.000  1.00  0.00           C  ',
+            //        residue 6 (no ins code)
+            'ATOM      6  CA  LEU A   6      16.000  17.000  18.000  1.00  0.00           C  ',
+            //        residue 7 (no ins code) — same auth_seq_id as 7A above
+            'ATOM      7  CA  ILE A   7      19.000  20.000  21.000  1.00  0.00           C  ',
+            //        residue 8 (no ins code) — same auth_seq_id as 8A above
+            'ATOM      8  CA  PRO A   8      22.000  23.000  24.000  1.00  0.00           C  ',
+            'END                                                                             ',
+        ].join('\n'));
+
+        const cif = await pdbToMmCif(pdb);
+        const atomSite = cif.categories['atom_site'];
+        const labelSeqId = atomSite.getField('label_seq_id')!;
+
+        // label_seq_id must be strictly increasing: 1, 2, 3, 4, 5, 6, 7, 8
+        for (let i = 0; i < labelSeqId.rowCount; ++i) {
+            expect(labelSeqId.int(i)).toBe(i + 1);
+        }
+    });
+
+    it('produces linear label_seq_id with insertion codes when SEQRES is present', async () => {
+        // Same 1NSA-like scenario but now with a SEQRES record.
+        // The alignment should still produce strictly sequential label_seq_id.
+        const pdb = makePdb([
+            'SEQRES   1 A    8  HIS PHE GLY ALA VAL LEU ILE PRO                           ',
+            'ATOM      1  CA  HIS A   7A      1.000   2.000   3.000  1.00  0.00           C  ',
+            'ATOM      2  CA  PHE A   8A      4.000   5.000   6.000  1.00  0.00           C  ',
+            'ATOM      3  CA  GLY A   9A      7.000   8.000   9.000  1.00  0.00           C  ',
+            'ATOM      4  CA  ALA A   4      10.000  11.000  12.000  1.00  0.00           C  ',
+            'ATOM      5  CA  VAL A   5      13.000  14.000  15.000  1.00  0.00           C  ',
+            'ATOM      6  CA  LEU A   6      16.000  17.000  18.000  1.00  0.00           C  ',
+            'ATOM      7  CA  ILE A   7      19.000  20.000  21.000  1.00  0.00           C  ',
+            'ATOM      8  CA  PRO A   8      22.000  23.000  24.000  1.00  0.00           C  ',
+            'END                                                                             ',
+        ].join('\n'));
+
+        const cif = await pdbToMmCif(pdb);
+        const atomSite = cif.categories['atom_site'];
+        const labelSeqId = atomSite.getField('label_seq_id')!;
+
+        // All 8 residues observed, aligned to SEQRES positions 1–8
+        for (let i = 0; i < labelSeqId.rowCount; ++i) {
+            expect(labelSeqId.int(i)).toBe(i + 1);
+        }
+    });
 });
