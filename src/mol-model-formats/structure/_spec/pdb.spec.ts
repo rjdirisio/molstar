@@ -1,11 +1,20 @@
 /**
- * Copyright (c) 2019 mol* contributors, licensed under MIT, See LICENSE file for more info.
+ * Copyright (c) 2019-2026 mol* contributors, licensed under MIT, See LICENSE file for more info.
  *
  * @author Alexander Rose <alexander.rose@weirdbyte.de>
+ * @author Ryan DiRisio <rjdiris@gmail.com>
  */
 
-import { TokenBuilder } from '../../../mol-io/reader/common/text/tokenizer';
+import { TokenBuilder, Tokenizer } from '../../../mol-io/reader/common/text/tokenizer';
 import { guessElementSymbolTokens } from '../util';
+import { pdbToMmCif } from '../pdb/to-cif';
+import { PdbFile } from '../../../mol-io/reader/pdb/schema';
+
+/** Helper: build a PdbFile from a raw PDB string. */
+function makePdb(pdbText: string): PdbFile {
+    const lines = Tokenizer.readAllLines(pdbText);
+    return { lines, variant: 'pdb' };
+}
 
 const records = [
     ['ATOM     19 HD23 LEU A   1     151.940 143.340 155.670  0.00  0.00', 'H'],
@@ -22,5 +31,144 @@ describe('PDB to-cif', () => {
             guessElementSymbolTokens(tokens, data, 12, 16);
             expect(data.substring(tokens.indices[0], tokens.indices[1])).toBe(element);
         }
+    });
+});
+
+describe('PDB SEQRES-to-label_seq_id alignment', () => {
+    it('assigns label_seq_id using SEQRES alignment for a complete chain', async () => {
+        // SEQRES declares ALA GLY VAL; ATOM records observe ALA GLY VAL at auth_seq_id 1-3.
+        // All residues match, so label_seq_id should be 1, 2, 3.
+        const pdb = makePdb([
+            'SEQRES   1 A    3  ALA GLY VAL                                               ',
+            'ATOM      1  CA  ALA A   1       1.000   2.000   3.000  1.00  0.00           C  ',
+            'ATOM      2  CA  GLY A   2       4.000   5.000   6.000  1.00  0.00           C  ',
+            'ATOM      3  CA  VAL A   3       7.000   8.000   9.000  1.00  0.00           C  ',
+            'END                                                                             ',
+        ].join('\n'));
+
+        const cif = await pdbToMmCif(pdb);
+        const atomSite = cif.categories['atom_site'];
+        const labelSeqId = atomSite.getField('label_seq_id')!;
+
+        expect(labelSeqId.int(0)).toBe(1);
+        expect(labelSeqId.int(1)).toBe(2);
+        expect(labelSeqId.int(2)).toBe(3);
+    });
+
+    it('offsets label_seq_id when leading SEQRES residues are missing from ATOM', async () => {
+        // SEQRES: MET ALA GLY VAL (4 residues)
+        // ATOM: only ALA GLY VAL at auth_seq_id 2-4.
+        // MET is unobserved, so ALA aligns to SEQRES position 2, GLY→3, VAL→4.
+        const pdb = makePdb([
+            'SEQRES   1 A    4  MET ALA GLY VAL                                           ',
+            'ATOM      1  CA  ALA A   2       1.000   2.000   3.000  1.00  0.00           C  ',
+            'ATOM      2  CA  GLY A   3       4.000   5.000   6.000  1.00  0.00           C  ',
+            'ATOM      3  CA  VAL A   4       7.000   8.000   9.000  1.00  0.00           C  ',
+            'END                                                                             ',
+        ].join('\n'));
+
+        const cif = await pdbToMmCif(pdb);
+        const atomSite = cif.categories['atom_site'];
+        const labelSeqId = atomSite.getField('label_seq_id')!;
+
+        expect(labelSeqId.int(0)).toBe(2); // ALA -> SEQRES pos 2
+        expect(labelSeqId.int(1)).toBe(3); // GLY -> SEQRES pos 3
+        expect(labelSeqId.int(2)).toBe(4); // VAL -> SEQRES pos 4
+    });
+
+    it('handles an internal gap in observed residues', async () => {
+        // SEQRES: ALA GLY VAL LEU (4 residues)
+        // ATOM: ALA VAL LEU (GLY is missing in the middle)
+        // Alignment: ALA→1, VAL→3, LEU→4
+        const pdb = makePdb([
+            'SEQRES   1 A    4  ALA GLY VAL LEU                                           ',
+            'ATOM      1  CA  ALA A   1       1.000   2.000   3.000  1.00  0.00           C  ',
+            'ATOM      2  CA  VAL A   3       4.000   5.000   6.000  1.00  0.00           C  ',
+            'ATOM      3  CA  LEU A   4       7.000   8.000   9.000  1.00  0.00           C  ',
+            'END                                                                             ',
+        ].join('\n'));
+
+        const cif = await pdbToMmCif(pdb);
+        const atomSite = cif.categories['atom_site'];
+        const labelSeqId = atomSite.getField('label_seq_id')!;
+
+        expect(labelSeqId.int(0)).toBe(1); // ALA -> SEQRES pos 1
+        expect(labelSeqId.int(1)).toBe(3); // VAL -> SEQRES pos 3
+        expect(labelSeqId.int(2)).toBe(4); // LEU -> SEQRES pos 4
+    });
+
+    it('assigns label_seq_id for multiple chains independently', async () => {
+        // Chain A SEQRES: MET ALA, ATOM: ALA (at pos 2)
+        // Chain B SEQRES: GLY VAL LEU, ATOM: GLY VAL LEU (at pos 1,2,3)
+        const pdb = makePdb([
+            'SEQRES   1 A    2  MET ALA                                                   ',
+            'SEQRES   1 B    3  GLY VAL LEU                                                ',
+            'ATOM      1  CA  ALA A   2       1.000   2.000   3.000  1.00  0.00           C  ',
+            'TER       2      ALA A   2                                                     ',
+            'ATOM      3  CA  GLY B   1       4.000   5.000   6.000  1.00  0.00           C  ',
+            'ATOM      4  CA  VAL B   2       7.000   8.000   9.000  1.00  0.00           C  ',
+            'ATOM      5  CA  LEU B   3      10.000  11.000  12.000  1.00  0.00           C  ',
+            'END                                                                             ',
+        ].join('\n'));
+
+        const cif = await pdbToMmCif(pdb);
+        const atomSite = cif.categories['atom_site'];
+        const labelSeqId = atomSite.getField('label_seq_id')!;
+
+        // Chain A: ALA aligns to SEQRES position 2
+        expect(labelSeqId.int(0)).toBe(2);
+        // Chain B: GLY→1, VAL→2, LEU→3
+        expect(labelSeqId.int(1)).toBe(1);
+        expect(labelSeqId.int(2)).toBe(2);
+        expect(labelSeqId.int(3)).toBe(3);
+    });
+
+    it('populates pdbx_unobs_or_zero_occ_residues for missing SEQRES residues', async () => {
+        // SEQRES: MET ALA GLY VAL (4 residues), ATOM: ALA GLY (pos 2,3)
+        // MET (pos 1) and VAL (pos 4) should appear in unobs
+        const pdb = makePdb([
+            'SEQRES   1 A    4  MET ALA GLY VAL                                           ',
+            'ATOM      1  N   ALA A   2       1.000   2.000   3.000  1.00  0.00           N  ',
+            'ATOM      2  CA  ALA A   2       1.500   2.500   3.500  1.00  0.00           C  ',
+            'ATOM      3  C   ALA A   2       2.000   3.000   4.000  1.00  0.00           C  ',
+            'ATOM      4  N   GLY A   3       4.000   5.000   6.000  1.00  0.00           N  ',
+            'ATOM      5  CA  GLY A   3       4.500   5.500   6.500  1.00  0.00           C  ',
+            'ATOM      6  C   GLY A   3       5.000   6.000   7.000  1.00  0.00           C  ',
+            'END                                                                             ',
+        ].join('\n'));
+
+        const cif = await pdbToMmCif(pdb);
+        const unobs = cif.categories['pdbx_unobs_or_zero_occ_residues'];
+        expect(unobs).toBeDefined();
+
+        const unobsSeqId = unobs.getField('label_seq_id')!;
+        const unobsCompId = unobs.getField('label_comp_id')!;
+        expect(unobsSeqId.rowCount).toBe(2);
+
+        // Positions 1 (MET) and 4 (VAL) are unobserved
+        expect(unobsSeqId.int(0)).toBe(1);
+        expect(unobsCompId.str(0)).toBe('MET');
+        expect(unobsSeqId.int(1)).toBe(4);
+        expect(unobsCompId.str(1)).toBe('VAL');
+    });
+
+    it('handles multiple atoms per residue correctly', async () => {
+        // SEQRES: MET ALA, ATOM: ALA with N, CA, C atoms
+        // All 3 atoms of ALA should get label_seq_id = 2
+        const pdb = makePdb([
+            'SEQRES   1 A    2  MET ALA                                                   ',
+            'ATOM      1  N   ALA A   2       1.000   2.000   3.000  1.00  0.00           N  ',
+            'ATOM      2  CA  ALA A   2       1.500   2.500   3.500  1.00  0.00           C  ',
+            'ATOM      3  C   ALA A   2       2.000   3.000   4.000  1.00  0.00           C  ',
+            'END                                                                             ',
+        ].join('\n'));
+
+        const cif = await pdbToMmCif(pdb);
+        const atomSite = cif.categories['atom_site'];
+        const labelSeqId = atomSite.getField('label_seq_id')!;
+
+        expect(labelSeqId.int(0)).toBe(2);
+        expect(labelSeqId.int(1)).toBe(2);
+        expect(labelSeqId.int(2)).toBe(2);
     });
 });
