@@ -180,6 +180,21 @@ function computeSeqresAlignments(
     return seqresAlignments;
 }
 
+/**
+ * Determine the starting label_seq_id when entering a new chain.
+ * If the SEQRES alignment mapped the first observed residue to a position,
+ * use that position (so numbering matches the full SEQRES sequence).
+ * Otherwise fall back to 1 (linear numbering) or the raw auth_seq_id.
+ */
+function initialLabelSeqId(
+    alignment: number[] | undefined,
+    seqId: number,
+    useLinear: boolean,
+): number {
+    const alignedPos = alignment ? alignment[0] : UNALIGNED;
+    return alignedPos !== UNALIGNED ? alignedPos : (useLinear ? 1 : seqId);
+}
+
 export function getAtomSite(sites: AtomSiteTemplate, labelAsymIdHelper: LabelAsymIdHelper, options: { hasAssemblies: boolean, seqresMap?: Map<string, string[]> }): { [K in keyof mmCIF_Schema['atom_site'] | 'partial_charge']?: CifField } {
     labelAsymIdHelper.clear();
 
@@ -216,8 +231,7 @@ export function getAtomSite(sites: AtomSiteTemplate, labelAsymIdHelper: LabelAsy
     // Initialize alignment state for the first chain
     let alignmentForChain = seqresAlignments.get(currAsymId);
     let chainResidueIdx = 0;
-    const firstAlignedPos = alignmentForChain ? alignmentForChain[0] : 0;
-    let currLabelSeqId = firstAlignedPos > 0 ? firstAlignedPos : (useLinearLabelSeqId ? 1 : currSeqId);
+    let currLabelSeqId = initialLabelSeqId(alignmentForChain, currSeqId, useLinearLabelSeqId);
 
     const asymIdCounts = new Map<string, number>();
     const atomIdCounts = new Map<string, number>();
@@ -243,8 +257,7 @@ export function getAtomSite(sites: AtomSiteTemplate, labelAsymIdHelper: LabelAsy
             currInsCode = insCode;
             alignmentForChain = seqresAlignments.get(asymId);
             chainResidueIdx = 0;
-            const alignedPos = alignmentForChain ? alignmentForChain[0] : 0;
-            currLabelSeqId = alignedPos > 0 ? alignedPos : (useLinearLabelSeqId ? 1 : currSeqId);
+            currLabelSeqId = initialLabelSeqId(alignmentForChain, currSeqId, useLinearLabelSeqId);
         } else if (currAsymId !== asymId) {
             atomIdCounts.clear();
             currAsymId = asymId;
@@ -252,8 +265,7 @@ export function getAtomSite(sites: AtomSiteTemplate, labelAsymIdHelper: LabelAsy
             currInsCode = insCode;
             alignmentForChain = seqresAlignments.get(asymId);
             chainResidueIdx = 0;
-            const alignedPos = alignmentForChain ? alignmentForChain[0] : 0;
-            currLabelSeqId = alignedPos > 0 ? alignedPos : (useLinearLabelSeqId ? 1 : currSeqId);
+            currLabelSeqId = initialLabelSeqId(alignmentForChain, seqId, useLinearLabelSeqId);
         } else if (currSeqId !== seqId || currInsCode !== insCode) {
             atomIdCounts.clear();
             chainResidueIdx++;
