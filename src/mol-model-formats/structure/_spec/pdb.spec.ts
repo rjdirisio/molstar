@@ -150,6 +150,21 @@ describe('PDB SEQRES-to-label_seq_id alignment', () => {
         expect(unobsCompId.str(0)).toBe('MET');
         expect(unobsSeqId.int(1)).toBe(4);
         expect(unobsCompId.str(1)).toBe('VAL');
+
+        // entity_poly_seq should list all 4 SEQRES residues with 1-based numbering
+        const entityPolySeq = cif.categories['entity_poly_seq'];
+        expect(entityPolySeq).toBeDefined();
+        const epsNum = entityPolySeq.getField('num')!;
+        const epsMonId = entityPolySeq.getField('mon_id')!;
+        expect(epsNum.rowCount).toBe(4);
+        expect(epsNum.int(0)).toBe(1);
+        expect(epsMonId.str(0)).toBe('MET');
+        expect(epsNum.int(1)).toBe(2);
+        expect(epsMonId.str(1)).toBe('ALA');
+        expect(epsNum.int(2)).toBe(3);
+        expect(epsMonId.str(2)).toBe('GLY');
+        expect(epsNum.int(3)).toBe(4);
+        expect(epsMonId.str(3)).toBe('VAL');
     });
 
     it('handles multiple atoms per residue correctly', async () => {
