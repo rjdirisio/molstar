@@ -86,17 +86,20 @@ export class LabelAsymIdHelper {
     }
 }
 
+/** Sentinel value indicating an observed residue could not be aligned to any SEQRES position. */
+const UNALIGNED = -1;
+
 /**
  * Align observed comp_ids against SEQRES comp_ids using Needleman-Wunsch.
  * Returns an array where result[i] is the 1-based SEQRES position for observed[i],
- * or 0 if the observed residue could not be aligned to any SEQRES position.
+ * or UNALIGNED (-1) if the observed residue could not be aligned to any SEQRES position.
  */
 function alignCompIdsToSeqres(seqres: string[], observed: string[]): number[] {
     const n = observed.length;
     const m = seqres.length;
 
     if (n === 0) return [];
-    if (m === 0) return new Array(n).fill(0);
+    if (m === 0) return new Array(n).fill(UNALIGNED);
 
     // align() concatenates elements into a string for its output, so multi-char
     // comp_ids (e.g. 'ALA') would be unparseable. Map each unique comp_id to a
@@ -115,7 +118,7 @@ function alignCompIdsToSeqres(seqres: string[], observed: string[]): number[] {
     const { aliA, aliB } = align(seqA, seqB);
 
     // Walk the alignment to build the position mapping
-    const result = new Array<number>(n).fill(0);
+    const result = new Array<number>(n).fill(UNALIGNED);
     let obsIdx = 0, seqresIdx = 0;
     for (let k = 0, kl = aliA.length; k < kl; k++) {
         const hasObs = aliA[k] !== '-';
@@ -182,9 +185,10 @@ function computeSeqresAlignments(
 
 /**
  * Determine the starting label_seq_id when entering a new chain.
- * If the SEQRES alignment mapped the first observed residue to a position,
- * use that position (so numbering matches the full SEQRES sequence).
- * Otherwise fall back to 1 (linear numbering) or the raw auth_seq_id.
+ * If the SEQRES alignment mapped the first observed residue to a position
+ * (i.e. not UNALIGNED), use that position so numbering matches the full
+ * SEQRES sequence. Otherwise fall back to 1 (linear numbering) or the
+ * raw auth_seq_id.
  */
 function initialLabelSeqId(
     alignment: number[] | undefined,
@@ -270,8 +274,8 @@ export function getAtomSite(sites: AtomSiteTemplate, labelAsymIdHelper: LabelAsy
             atomIdCounts.clear();
             chainResidueIdx++;
             const alignedPos = alignmentForChain && chainResidueIdx < alignmentForChain.length
-                ? alignmentForChain[chainResidueIdx] : 0;
-            if (alignedPos > 0) {
+                ? alignmentForChain[chainResidueIdx] : UNALIGNED;
+            if (alignedPos !== UNALIGNED) {
                 currLabelSeqId = alignedPos;
             } else if (currSeqId === currLabelSeqId && !useLinearLabelSeqId) {
                 currLabelSeqId = seqId;
