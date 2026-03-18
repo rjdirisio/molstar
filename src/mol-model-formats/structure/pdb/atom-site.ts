@@ -102,22 +102,7 @@ function alignCompIdsToSeqres(seqres: string[], observed: string[]): number[] {
     if (n === 0) return [];
     if (m === 0) return new Array(n).fill(UNALIGNED);
 
-    // align() concatenates elements into a string for its output, so multi-char
-    // comp_ids (e.g. 'ALA') would be unparseable. Map each unique comp_id to a
-    // single Unicode character. align()'s default scoring uses === comparison
-    // (match=5, mismatch=-3) with affine gap penalties (open=-11, extend=-1).
-    const charByCompId = new Map<string, string>();
-    const allCompIds = new Set([...seqres, ...observed]);
-    let code = 0x41; // start at 'A'
-    for (const id of allCompIds) {
-        charByCompId.set(id, String.fromCodePoint(code++));
-    }
-
-    const seqA = observed.map(id => charByCompId.get(id)!);
-    const seqB = seqres.map(id => charByCompId.get(id)!);
-
-    const { aliA, aliB } = align(seqA, seqB);
-
+    const { aliA, aliB } = align(observed, seqres);
     // Walk the alignment to build the position mapping
     const result = new Array<number>(n).fill(UNALIGNED);
     let obsIdx = 0, seqresIdx = 0;
@@ -134,7 +119,6 @@ function alignCompIdsToSeqres(seqres: string[], observed: string[]): number[] {
             seqresIdx++;
         }
     }
-
     return result;
 }
 
