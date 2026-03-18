@@ -5,6 +5,7 @@
  * @author Ryan DiRisio <rjdiris@gmail.com>
  */
 
+import { isDebugMode } from '../../../mol-util/debug';
 import { SubstitutionMatrix, SubstitutionMatrices, SubstitutionMatrixData } from './substitution-matrix';
 
 const DefaultAlignmentOptions = {
@@ -68,15 +69,11 @@ class Alignment {
             return function score(i: number, j: number) {
                 const cA = seqA[i];
                 const cB = seqB[j];
-                const row = substMatrix[cA];
-                if (!row) {
-                    throw new Error(`Substitution matrix has no entry for residue '${cA}' (seqA[${i}]). Non-standard residues are not supported with BLOSUM matrices.`);
+                const val = substMatrix[cA]?.[cB];
+                if (isDebugMode && val === undefined) {
+                    console.warn(`Substitution matrix has no entry for residue pair ('${cA}', '${cB}') (seqA[${i}], seqB[${j}]). Non-standard residues are not supported with BLOSUM matrices.`);
                 }
-                const val = row[cB];
-                if (val === undefined) {
-                    throw new Error(`Substitution matrix has no entry for residue pair ('${cA}', '${cB}') (seqA[${i}], seqB[${j}]). Non-standard residues are not supported with BLOSUM matrices.`);
-                }
-                return val;
+                return val ?? 0;
             };
         } else {
             return function scoreNoSubstMat(i: number, j: number) {
