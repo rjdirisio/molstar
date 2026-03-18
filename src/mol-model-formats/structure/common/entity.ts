@@ -118,6 +118,9 @@ export class EntityBuilder {
 
     /** Get entity_id for a chain based on SEQRES data. Only valid after all atoms have been processed via getEntityId. */
     getEntityIdForChain(chainId: string): string | undefined {
+        if (this.compoundsMap.size === 0 && this.chainMap.size === 0 && this.sequenceMap.size === 0) {
+            throw new Error('EntityBuilder.getEntityIdForChain called before any atoms were processed. Call getEntityId for all atoms first.');
+        }
         if (this.compoundsMap.has(chainId)) {
             return this.compoundsMap.get(chainId)!;
         }
